@@ -113,7 +113,7 @@ BOOL BuildTable(
 #define PATTERN_FOUND(s, x) { printf_s("%s\t\t0x%lx\r\n", s, x);} 
 #define PATTERN_FOUND2(s, x) { printf_s("%s\t0x%lx\r\n", s, x);} 
 
-#define PATTERN_NOT_FOUND(s) { printf_s("\tPattern %s was not found\r\n", s); }
+#define PATTERN_NOT_FOUND(s) { printf_s("Pattern %s was not found\r\n", s); }
 
 /*
 * ProcessVirtualBoxFile
@@ -190,12 +190,25 @@ UINT ProcessVirtualBoxFile(
             DataBlocks[c].VirtualOffset = (ULONG)(4 + Pattern - DllBase);
             DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
             RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
-            PATTERN_FOUND("FACP", (ULONG)DataBlocks[c].VirtualOffset);
+            PATTERN_FOUND("FACP (pre v6.1)", (ULONG)DataBlocks[c].VirtualOffset);
             c += 1;
-
         }
         else {
-            PATTERN_NOT_FOUND("FACP");
+            PATTERN_NOT_FOUND("FACP (pre v6.1)");
+        }
+
+        Pattern = FindPattern(
+            (CONST PBYTE)DllBase, DllVirtualSize,
+            (CONST PBYTE)FACP_PATTERN_61, sizeof(FACP_PATTERN_61));
+        if (Pattern) {
+            DataBlocks[c].VirtualOffset = (ULONG)(4 + Pattern - DllBase);
+            DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
+            RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
+            PATTERN_FOUND("FACP (v6.1+)", (ULONG)DataBlocks[c].VirtualOffset);
+            c += 1;
+        }
+        else {
+            PATTERN_NOT_FOUND("FACP (v6.1+)");
         }
 
         //
@@ -208,11 +221,25 @@ UINT ProcessVirtualBoxFile(
             DataBlocks[c].VirtualOffset = (ULONG)(3 + Pattern - DllBase);
             DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
             RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
-            PATTERN_FOUND("RSDT", (ULONG)DataBlocks[c].VirtualOffset);
+            PATTERN_FOUND("RSDT (pre 6.1)", (ULONG)DataBlocks[c].VirtualOffset);
             c += 1;
         }
         else {
-            PATTERN_NOT_FOUND("RSDT");
+            PATTERN_NOT_FOUND("RSDT (pre 6.1)");
+        }
+
+        Pattern = FindPattern(
+            (CONST PBYTE)DllBase, DllVirtualSize,
+            (CONST PBYTE)RSDT_PATTERN_61, sizeof(RSDT_PATTERN_61));
+        if (Pattern) {
+            DataBlocks[c].VirtualOffset = (ULONG)(3 + Pattern - DllBase);
+            DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
+            RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
+            PATTERN_FOUND("RSDT (6.1+)", (ULONG)DataBlocks[c].VirtualOffset);
+            c += 1;
+        }
+        else {
+            PATTERN_NOT_FOUND("RSDT (pre 6.1+)");
         }
 
         //
@@ -329,11 +356,25 @@ UINT ProcessVirtualBoxFile(
             DataBlocks[c].VirtualOffset = (ULONG)(3 + Pattern - DllBase);
             DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
             RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);      
-            PATTERN_FOUND("VBOX", (ULONG)DataBlocks[c].VirtualOffset);
+            PATTERN_FOUND("VBOX (pre 6.1)", (ULONG)DataBlocks[c].VirtualOffset);
             c += 1;
         }
         else {
-            PATTERN_NOT_FOUND("VBOX generic");
+            PATTERN_NOT_FOUND("VBOX generic (pre 6.1)");
+        }
+
+        Pattern = FindPattern(
+            (CONST PBYTE)DllBase, DllVirtualSize,
+            (CONST PBYTE)JUSTVBOX_PATTERN_61, sizeof(JUSTVBOX_PATTERN_61));
+        if (Pattern) {
+            DataBlocks[c].VirtualOffset = (ULONG)(3 + Pattern - DllBase);
+            DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
+            RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
+            PATTERN_FOUND("VBOX (6.1+)", (ULONG)DataBlocks[c].VirtualOffset);
+            c += 1;
+        }
+        else {
+            PATTERN_NOT_FOUND("VBOX generic (6.1+)");
         }
 
         //locate VirtualBox pattern
@@ -417,12 +458,27 @@ UINT ProcessVirtualBoxFile(
             DataBlocks[c].VirtualOffset = (ULONG)(26 + Pattern - DllBase);
             DataBlocks[c].DataLength = sizeof(CONFIGURATION_PATCH);
             RtlCopyMemory(DataBlocks[c].Data, CONFIGURATION_PATCH, DataBlocks[c].DataLength);
-            PATTERN_FOUND("Configuration", (ULONG)DataBlocks[c].VirtualOffset);
+            PATTERN_FOUND("Configuration (pre 6.1)", (ULONG)DataBlocks[c].VirtualOffset);
             c += 1;
         }
         else {
-            PATTERN_NOT_FOUND("Configuration");
+            PATTERN_NOT_FOUND("Configuration (pre 6.1)");
         }
+
+        Pattern = FindPattern(
+            (CONST PBYTE)DllBase, DllVirtualSize,
+            (CONST PBYTE)CFGSTRINGS_PATTERN_61, sizeof(CFGSTRINGS_PATTERN_61));
+        if (Pattern) {
+            DataBlocks[c].VirtualOffset = (ULONG)(26 + Pattern - DllBase);
+            DataBlocks[c].DataLength = sizeof(CONFIGURATION_PATCH_61);
+            RtlCopyMemory(DataBlocks[c].Data, CONFIGURATION_PATCH_61, DataBlocks[c].DataLength);
+            PATTERN_FOUND("Configuration (6.1+)", (ULONG)DataBlocks[c].VirtualOffset);
+            c += 1;
+        }
+        else {
+            PATTERN_NOT_FOUND("Configuration (6.1+)");
+        }
+
 
         //
         // HWID

@@ -6,7 +6,7 @@
 
 x64 Windows 7/8/8.1/10;
 
-VirtualBox 6.1.0 and later versions.
+VirtualBox 6.1.2 and later versions.
 
 For version below VirtualBox 6.1 please use older release of this loader.
 
