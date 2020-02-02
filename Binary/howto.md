@@ -132,13 +132,13 @@ Close VirtualBox if it opened.
 
 Open elevated command line prompt. Run cmd.exe as admin and switch current directory to C:\VBoxLdr (or where you saved Binary folder). Use tdl.exe to load monitoring driver, type as below on screenshot:
 
-<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/11_tdl_tsugumi_before.png" />
+<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/11_loader_before.png" />
 
 Upon successful execution you will see something like that:
 
-<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/12_tdl_tsugumi_after.png" />
+<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/12_loader_after.png" />
 
-Done, monitoring driver loaded and configured.
+Done, monitoring driver loaded and configured. You will have to repeat this (and only) step each time you boot Windows, because monitoring driver will be unloaded automatically upon system shutdown/reboot.
 
 ### Step 5. Stopping monitoring driver.
 
@@ -163,6 +163,8 @@ For example, if you are using VirtualBox 6.1.2 then
 To automate this you can add the following string to EFI vm configuration scripts
 
 *%vboxman% setextradata "%1" "VBoxInternal/Devices/efi/0/Config/EfiRom" full_path_to_your_patched_efirom*
+
+Note: configuration scripts hidevm_efiahci/hidevm_efiide already has this setting set.
 
 ### Appendix B: Uninstalling VirtualBox loader
 
