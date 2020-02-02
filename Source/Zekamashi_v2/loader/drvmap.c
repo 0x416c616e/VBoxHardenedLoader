@@ -26,6 +26,39 @@
 PMAPPED_CODE_DATA g_MappedData;
 
 /*
+* SizeOfProc
+*
+* Purpose:
+*
+* Very simplified. Return size of procedure when first ret meet.
+*
+*/
+ULONG SizeOfProc(
+    _In_ PBYTE FunctionPtr)
+{
+    ULONG   c = 0;
+    UCHAR* p;
+    hde64s  hs;
+
+    __try {
+
+        do {
+            p = FunctionPtr + c;
+            hde64_disasm(p, &hs);
+            if (hs.flags & F_ERROR)
+                break;
+            c += hs.len;
+
+        } while (*p != 0xC3);
+
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    return c;
+}
+
+/*
 * VirtualToPhysical
 *
 * Purpose:

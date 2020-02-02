@@ -32,6 +32,7 @@
 #include "ntdll/ntos.h"
 #include "minirtl/minirtl.h"
 #include "minirtl/cmdline.h"
+#include "hde/hde64.h"
 #include "patterns.h"
 #include "consts.h"
 #include "sup.h"

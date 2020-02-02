@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="drvmap.c" />
+    <ClCompile Include="hde\hde64.c" />
     <ClCompile Include="idrv\nal.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="minirtl\cmdline.c" />
@@ -146,6 +147,9 @@
     <ClInclude Include="consts.h" />
     <ClInclude Include="drvmap.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="hde\hde64.h" />
+    <ClInclude Include="hde\pstdint.h" />
+    <ClInclude Include="hde\table64.h" />
     <ClInclude Include="idrv\nal.h" />
     <ClInclude Include="minirtl\cmdline.h" />
     <ClInclude Include="minirtl\minirtl.h" />
