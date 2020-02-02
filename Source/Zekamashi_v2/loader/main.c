@@ -227,6 +227,37 @@ BOOL CreatePatchTable(
 }
 
 /*
+* AssignPrivileges
+*
+* Purpose:
+*
+* Assign required privileges.
+*
+*/
+BOOLEAN AssignPrivileges(
+    _In_ BOOLEAN IsDebugRequired
+)
+{
+    NTSTATUS ntStatus;
+
+    if (IsDebugRequired) {
+        ntStatus = supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE);
+        if (!NT_SUCCESS(ntStatus)) {
+            printf_s("[!] Abort: SeDebugPrivilege is not assigned! NTSTATUS (0x%lX)\r\n", ntStatus);
+            return FALSE;
+        }
+    }
+
+    ntStatus = supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE);
+    if (!NT_SUCCESS(ntStatus)) {
+        printf_s("[!] Abort: SeLoadDriverPrivilege is not assigned! NTSTATUS (0x%lX)\r\n", ntStatus);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*
 * VBoxLdrMain
 *
 * Purpose:
@@ -314,9 +345,12 @@ int VBoxLdrMain(
             0))
         {
             printf_s(T_PRNTDEFAULT, "LDR: monitor stop selected");
-            VictimRelease((LPWSTR)PROCEXP152);
-            printf_s(T_PRNTDEFAULT, "LDR: purging system cache");
-            supPurgeSystemCache();
+
+            if (AssignPrivileges(FALSE)) {
+                VictimRelease((LPWSTR)PROCEXP152);
+                printf_s(T_PRNTDEFAULT, "LDR: purging system cache");
+                supPurgeSystemCache();
+            }
             break;
         }
         else {
@@ -381,28 +415,18 @@ int VBoxLdrMain(
         }
 #endif
 
-        NTSTATUS ntStatus;
+        if (AssignPrivileges(TRUE)) {
 
-        ntStatus = supEnablePrivilege(SE_DEBUG_PRIVILEGE, TRUE);
-        if (!NT_SUCCESS(ntStatus)) {
-            printf_s("[!] Abort: SeDebugPrivilege not assigned! NTSTATUS (0x%lX)\r\n", ntStatus);
-            break;
-        }
+            if (!MapTsugumi(&g_PatchData)) {
+                printf_s(T_PRNTDEFAULT, "LDR: Cannot inject monitor code");
+                break;
+            }
+            else {
+                printf_s(T_PRNTDEFAULT, "LDR: monitor code injected and executed");
+                printf_s(T_PRNTDEFAULT, "LDR: purging system cache");
+                supPurgeSystemCache();
+            }
 
-        ntStatus = supEnablePrivilege(SE_LOAD_DRIVER_PRIVILEGE, TRUE);
-        if (!NT_SUCCESS(ntStatus)) {
-            printf_s("[!] Abort: SeLoadDriverPrivilege not assigned! NTSTATUS (0x%lX)\r\n", ntStatus);
-            break;
-        }
-
-        if (!MapTsugumi(&g_PatchData)) {
-            printf_s(T_PRNTDEFAULT, "LDR: Cannot inject monitor code");
-            break;
-        }
-        else {
-            printf_s(T_PRNTDEFAULT, "LDR: monitor code injected and executed");
-            printf_s(T_PRNTDEFAULT, "LDR: purging system cache");
-            supPurgeSystemCache();
         }
 
     } while (FALSE);

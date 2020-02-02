@@ -68,6 +68,5 @@ cd /d %vmscfgdir%
 %vboxman% setextradata "%1" "VBoxInternal/Devices/acpi/0/Config/SsdtFilePath" "%vmscfgdir%ACPI-SSDT.bin"
 %vboxman% setextradata "%1" "VBoxInternal/Devices/vga/0/Config/BiosRom" "%vmscfgdir%vgabios386.bin"
 %vboxman% setextradata "%1" "VBoxInternal/Devices/pcbios/0/Config/BiosRom" "%vmscfgdir%pcbios386.bin"
-%vboxman% setextradata "%1" "VBoxInternal/Devices/pcbios/0/Config/LanBootRom" "%vmscfgdir%pxerom.bin"
 
 @pause

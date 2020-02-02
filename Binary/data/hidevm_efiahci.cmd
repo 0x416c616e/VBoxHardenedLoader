@@ -68,5 +68,6 @@ cd /d %vmscfgdir%
 %vboxman% setextradata "%1" "VBoxInternal/Devices/acpi/0/Config/DsdtFilePath" "%vmscfgdir%ACPI-DSDT.bin"
 %vboxman% setextradata "%1" "VBoxInternal/Devices/acpi/0/Config/SsdtFilePath" "%vmscfgdir%ACPI-SSDT.bin"
 %vboxman% setextradata "%1" "VBoxInternal/Devices/vga/0/Config/BiosRom" "%vmscfgdir%vgabios386.bin"
+%vboxman% setextradata "%1" "VBoxInternal/Devices/efi/0/Config/EfiRom" "%vmscfgdir%efi_amd64_fixed_6.1.2.fd"
 
 @pause

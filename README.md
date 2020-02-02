@@ -31,7 +31,7 @@ Binary files (ACPI tables, BIOS roms), batch scripts from loader version 1.9+ ar
 
 # Installation and use guide
 
-TDB.
+TBD
 
 
 # Build 
