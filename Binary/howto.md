@@ -1,9 +1,8 @@
-TBD
-Placeholder for rewrite
-
 # Installation guide
 
-Step by step guide for VirtualBox x64 Hardened (5.1.16+) VM detection mitigation configuring.
+Step by step guide for VM detection mitigation configuring using VirtualBox x64 Hardened loader v2.
+
+Note: Minimum required VirtualBox version is 6.1.2
 
 Contents:
 
@@ -11,7 +10,7 @@ Contents:
  * Creating VM with required settings
  * Using batch script to apply fake VM system information
  * Loading monitoring driver for load-in-memory VM dll patch
- * Using VirtualBox loader to manage monitoring driver behavior
+ * Stopping monitoring driver
  * Warning: VirtualBox Additions 
  * Appendix A: Using EFI VM
  * Appendix B: Uninstalling VirtualBox loader
@@ -29,7 +28,7 @@ Contents:
 
 ### Step 2. Creating VM with required setting
 
-In this example we are installing and configuring VirtualBox on x64 notebook with 6Gb of RAM and 4x Intel Core i7 Haswell  CPU running full patch Windows 8.1.
+In this example we are installing and configuring VirtualBox on x64 PC running full patch Windows 8.1.
 
 Create a new virtual machine (in this example it will be named "vm0") and configure it in the following way:
 
@@ -139,24 +138,13 @@ Upon successful execution you will see something like that:
 
 <img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/12_tdl_tsugumi_after.png" />
 
-Done, monitoring driver loaded. Now we need to properly configure it. Do not start VirtualBox as we didn't finished yet.
+Done, monitoring driver loaded and configured.
 
-### Step 5. Using VirtualBox loader to manage monitoring driver behavior
+### Step 5. Stopping monitoring driver.
 
 Close VirtualBox if it opened.
 
-We need to give our monitoring driver proper data to work with. Loader.exe is the application that does this. Running it with /? will give you small help on it usage.
-<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/13_loader_help.png" />
-
-So we will just run it without parameters. In same elevated command line prompt type loader and press Enter, upon succesful execution you will see something like that:
-
-<img src="https://raw.githubusercontent.com/hfiref0x/VBoxHardenedLoader/master/Binary/help/14_loader_start.png" />
-
-That's is all. Now you can start VirtualBox and load prepared VM.
-
-If you want to stop monitoring driver, open elevated command line prompt, navigate to VBoxLdr folder and run loader with /s switch, e.g. loader.exe /s. To reenable monitoring just re-run loader without parameters elevated (as admin).
-Monitoring driver will be unloaded at Windows shutdown or reboot. To start it again repeat step 4 (step 5 repeat is only needed when you decided to upgrade VirtualBox without uninstalling previous version and rebooting).
-
+Open elevated command line prompt, navigate to VBoxLdr folder and run loader with /s switch, e.g. loader.exe /s. To reenable monitoring just re-run loader without parameters elevated (as admin). Monitoring driver will be unloaded at Windows shutdown or reboot. To start it again repeat step 4.
 
 ## Warning: VirtualBox Additions
 
@@ -164,40 +152,22 @@ Do not install VirtualBox Additions! This will ruin everything and there is NO w
 
 ### Appendix A: Using EFI VM
 
-There are two ways to set your patched/custom EFI ROM for EFI VM.
-
-##### 1. Replace VBoxEFI64.fd with patched
-During Step 3. 
-
-* Make backup copy of original `VBoxEFI64.fd` in VirtualBox directory somewhere;
-* Replace `VBoxEFI64.fd` in VirtualBox directory with it patched version from VBoxLdr\data directory. Select proper version of file and then rename it to `VBoxEFI64.fd` (e.g. you have installed 5.1.18 then select `VBoxEFI64_5.1.18.fd`);
-* Use hidevm_efiahci (AHCI controller mode) or hidevm_efiide (IDE controller mode) for your EFI VM.
-
-##### 2. Use vboxmanage setextradata
-It is the simple way, without any file replacing:
-* Configure VM to use alternative EFI ROM with help of VBoxManage.
+Configure VM to use alternative EFI ROM with help of VBoxManage.
 
 *vboxmanage setextradata vmname "VBoxInternal/Devices/efi/0/Config/EfiRom" full_path_to_your_patched_efirom*
 
-e.g. *vboxmanage setextradata vm01 "VBoxInternal/Devices/efi/0/Config/EfiRom" C:\VM\PinkiPie.fd*
+For example, if you are using VirtualBox 6.1.2 then
+
+*vboxmanage setextradata vm01 "VBoxInternal/Devices/efi/0/Config/EfiRom" C:\VBoxLdr\data\efi_amd64_fixed_6.1.2*
 
 To automate this you can add the following string to EFI vm configuration scripts
-*%vboxman% setextradata "%1" "VBoxInternal/Devices/efi/0/Config/EfiRom" full_path_to_your_patched_efirom*
 
-Note that some VirtualBox versions might not support this.
+*%vboxman% setextradata "%1" "VBoxInternal/Devices/efi/0/Config/EfiRom" full_path_to_your_patched_efirom*
 
 ### Appendix B: Uninstalling VirtualBox loader
 
-If monitoring driver loaded - reboot Windows. Delete VBoxLdr folder. Open regedit and delete keys 
-
->HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tsugumi
->
->HKEY_LOCAL_MACHINE\SOFTWARE\Tsugumi
-
-if present.
-
-If you used patched EFI module then restore `VBoxEFI64.fd` file from backup otherwise VirtualBox will be unable to work with EFI VM's.
+If monitoring driver loaded - reboot Windows. Delete VBoxLdr folder.
 
 ### Appendix C: Updating VirtualBox
 
-Scenario: you decided update VirtualBox without clean reinstall and rebooting your PC. Will the loader work with new version? Yes it will, but you need re-run loader.exe in elevated command prompt to update patch information for new version of VirtualBox dynamic link library VBoxDD.dll. Basically you need to repeat Step 5.
+Scenario: you decided update VirtualBox without clean reinstall and rebooting your PC. Will the loader work with new version? Yes it will, but you have to re-run loader.exe in elevated command prompt to update patch information for new version of VirtualBox dynamic link library VBoxDD.dll. Basically you need to repeat Step 4.
