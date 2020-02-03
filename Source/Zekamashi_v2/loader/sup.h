@@ -111,3 +111,9 @@ BOOL supQueryObjectFromHandle(
     _Out_ ULONG_PTR* Address);
 
 ULONG_PTR supQueryMaximumUserModeAddress();
+
+PVOID supFindPattern(
+    _In_ CONST PBYTE Buffer,
+    _In_ SIZE_T BufferSize,
+    _In_ CONST PBYTE Pattern,
+    _In_ SIZE_T PatternSize);

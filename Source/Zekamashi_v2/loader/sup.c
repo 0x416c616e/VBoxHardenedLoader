@@ -319,7 +319,6 @@ BOOL supProcessExist(
     _In_ LPWSTR lpProcessName
 )
 {
-    BOOL cond = FALSE;
     PSYSTEM_PROCESSES_INFORMATION ProcessList, pList;
     UNICODE_STRING procName;
     BOOL bResult = FALSE;
@@ -345,7 +344,7 @@ BOOL supProcessExist(
             pList = (PSYSTEM_PROCESSES_INFORMATION)(((LPBYTE)pList) + pList->NextEntryDelta);
         }
 
-    } while (cond);
+    } while (FALSE);
 
     supHeapFree(ProcessList);
     return bResult;
@@ -1189,4 +1188,47 @@ ULONG_PTR supQueryMaximumUserModeAddress()
         return (ULONG_PTR)systemInfo.lpMaximumApplicationAddress;
     }
 
+}
+
+/*
+* supFindPattern
+*
+* Purpose:
+*
+* Lookup pattern in buffer.
+*
+*/
+PVOID supFindPattern(
+    _In_ CONST PBYTE Buffer,
+    _In_ SIZE_T BufferSize,
+    _In_ CONST PBYTE Pattern,
+    _In_ SIZE_T PatternSize
+)
+{
+    PBYTE p0 = Buffer, pnext;
+
+    if (PatternSize == 0)
+        return NULL;
+
+    if (BufferSize < PatternSize)
+        return NULL;
+
+    do {
+        pnext = (PBYTE)memchr(p0, Pattern[0], BufferSize);
+        if (pnext == NULL)
+            break;
+
+        BufferSize -= (ULONG_PTR)(pnext - p0);
+
+        if (BufferSize < PatternSize)
+            return NULL;
+
+        if (memcmp(pnext, Pattern, PatternSize) == 0)
+            return pnext;
+
+        p0 = pnext + 1;
+        --BufferSize;
+    } while (BufferSize > 0);
+
+    return NULL;
 }

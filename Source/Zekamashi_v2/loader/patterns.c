@@ -19,44 +19,7 @@
 #define MAX_HWID_BLOCKS_DEEP   32
 #define MAX_PATCH_BLOCKS       64
 
-BINARY_PATCH_BLOCK_INTERNAL *DataBlocks;
-
-/*
-* FindPattern
-*
-* Purpose:
-*
-* Lookup pattern in buffer.
-*
-*/
-PVOID FindPattern(
-    CONST PBYTE Buffer,
-    SIZE_T BufferSize,
-    CONST PBYTE Pattern,
-    SIZE_T PatternSize
-)
-{
-    PBYTE	p = Buffer;
-
-    if (PatternSize == 0)
-        return NULL;
-    if (BufferSize < PatternSize)
-        return NULL;
-    BufferSize -= PatternSize;
-
-    do {
-        p = memchr(p, Pattern[0], BufferSize - (p - Buffer));
-        if (p == NULL)
-            break;
-
-        if (memcmp(p, Pattern, PatternSize) == 0)
-            return p;
-
-        p++;
-    } while (BufferSize - (p - Buffer) > 0);
-
-    return NULL;
-}
+BINARY_PATCH_BLOCK_INTERNAL* DataBlocks;
 
 /*
 * BuildTable
@@ -67,10 +30,10 @@ PVOID FindPattern(
 *
 */
 BOOL BuildTable(
-    _In_        BINARY_PATCH_BLOCK_INTERNAL *PatchBlock,
+    _In_        BINARY_PATCH_BLOCK_INTERNAL* PatchBlock,
     _In_        UINT BlockCount,
-    _In_        PVOID *OutputBuffer,
-    _Inout_opt_ DWORD *OutputBufferSize
+    _In_        PVOID* OutputBuffer,
+    _Inout_opt_ DWORD* OutputBufferSize
 )
 {
     UINT    i;
@@ -125,12 +88,11 @@ BOOL BuildTable(
 */
 UINT ProcessVirtualBoxFile(
     _In_        LPTSTR lpszPath,
-    _In_        PVOID *OutputBuffer,
-    _Inout_opt_ DWORD *OutputBufferSize
+    _In_        PVOID* OutputBuffer,
+    _Inout_opt_ DWORD* OutputBufferSize
 )
 {
     UINT                uResult = (UINT)-1;
-    BOOL                cond = FALSE;
     ULONG               c = 0, d = 0;
 
     HANDLE              fh = NULL, sec = NULL;
@@ -183,7 +145,7 @@ UINT ProcessVirtualBoxFile(
         //
         // FACP
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)FACP_PATTERN, sizeof(FACP_PATTERN));
         if (Pattern) {
@@ -197,7 +159,7 @@ UINT ProcessVirtualBoxFile(
             PATTERN_NOT_FOUND("FACP (pre v6.1)");
         }
 
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)FACP_PATTERN_61, sizeof(FACP_PATTERN_61));
         if (Pattern) {
@@ -214,7 +176,7 @@ UINT ProcessVirtualBoxFile(
         //
         // RSDT
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)RSDT_PATTERN, sizeof(RSDT_PATTERN));
         if (Pattern) {
@@ -228,7 +190,7 @@ UINT ProcessVirtualBoxFile(
             PATTERN_NOT_FOUND("RSDT (pre 6.1)");
         }
 
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)RSDT_PATTERN_61, sizeof(RSDT_PATTERN_61));
         if (Pattern) {
@@ -245,7 +207,7 @@ UINT ProcessVirtualBoxFile(
         //
         // XSDT
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)XSDT_PATTERN, sizeof(XSDT_PATTERN));
         if (Pattern) {
@@ -262,7 +224,7 @@ UINT ProcessVirtualBoxFile(
         //
         // APIC
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)APIC_PATTERN, sizeof(APIC_PATTERN));
         if (Pattern) {
@@ -279,7 +241,7 @@ UINT ProcessVirtualBoxFile(
         //
         // HPET
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)HPET_PATTERN, sizeof(HPET_PATTERN));
         if (Pattern) {
@@ -296,7 +258,7 @@ UINT ProcessVirtualBoxFile(
         //
         // MCFG
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)MCFG_PATTERN, sizeof(MCFG_PATTERN));
         if (Pattern) {
@@ -313,7 +275,7 @@ UINT ProcessVirtualBoxFile(
         //
         // VBOXCPU
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)VBOXCPU_PATTERN, sizeof(VBOXCPU_PATTERN));
         if (Pattern) {
@@ -331,7 +293,7 @@ UINT ProcessVirtualBoxFile(
         // VBOX 1.0 CDROM
         //
         /*
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)CDROMVBOX_PATTERN, sizeof(CDROMVBOX_PATTERN));
         if (Pattern) {
@@ -349,13 +311,13 @@ UINT ProcessVirtualBoxFile(
         //
         // VBOX generic
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)JUSTVBOX_PATTERN, sizeof(JUSTVBOX_PATTERN));
         if (Pattern) {
             DataBlocks[c].VirtualOffset = (ULONG)(3 + Pattern - DllBase);
             DataBlocks[c].DataLength = sizeof(VBOX_PATCH);
-            RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);      
+            RtlCopyMemory(DataBlocks[c].Data, VBOX_PATCH, DataBlocks[c].DataLength);
             PATTERN_FOUND("VBOX (pre 6.1)", (ULONG)DataBlocks[c].VirtualOffset);
             c += 1;
         }
@@ -363,7 +325,7 @@ UINT ProcessVirtualBoxFile(
             PATTERN_NOT_FOUND("VBOX generic (pre 6.1)");
         }
 
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)JUSTVBOX_PATTERN_61, sizeof(JUSTVBOX_PATTERN_61));
         if (Pattern) {
@@ -383,7 +345,7 @@ UINT ProcessVirtualBoxFile(
         //
         // 'VirtualBox'
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)JUSTVIRTUALBOX_PATTERN, sizeof(JUSTVIRTUALBOX_PATTERN));
         if (Pattern) {
@@ -400,7 +362,7 @@ UINT ProcessVirtualBoxFile(
         //
         // 'VirtualBox__'
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)VIRTUALBOX2020_PATTERN, sizeof(VIRTUALBOX2020_PATTERN));
         if (Pattern) {
@@ -417,7 +379,7 @@ UINT ProcessVirtualBoxFile(
         //
         // 'VirtualBox GIM'
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)VIRTUALBOXGIM_PATTERN, sizeof(VIRTUALBOXGIM_PATTERN));
         if (Pattern) {
@@ -434,7 +396,7 @@ UINT ProcessVirtualBoxFile(
         //
         // 'VirtualBox VMM'
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)VIRTUALBOXVMM_PATTERN, sizeof(VIRTUALBOXVMM_PATTERN));
         if (Pattern) {
@@ -451,7 +413,7 @@ UINT ProcessVirtualBoxFile(
         //locate Configuration pattern
         printf_s("\r\n%s\r\n\r\n", "Pattern matching: 'Configuration'");
 
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)CFGSTRINGS_PATTERN, sizeof(CFGSTRINGS_PATTERN));
         if (Pattern) {
@@ -465,7 +427,7 @@ UINT ProcessVirtualBoxFile(
             PATTERN_NOT_FOUND("Configuration (pre 6.1)");
         }
 
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)CFGSTRINGS_PATTERN_61, sizeof(CFGSTRINGS_PATTERN_61));
         if (Pattern) {
@@ -491,7 +453,7 @@ UINT ProcessVirtualBoxFile(
         d = 0;
         Pattern = DllBase;
         do {
-            Pattern = FindPattern(
+            Pattern = supFindPattern(
                 (CONST PBYTE)Pattern, DllVirtualSize - (Pattern - DllBase),
                 (CONST PBYTE)PCI80EE_PATTERN, sizeof(PCI80EE_PATTERN));
             if (Pattern) {
@@ -519,7 +481,7 @@ UINT ProcessVirtualBoxFile(
         d = 0;
         Pattern = DllBase;
         do {
-            Pattern = FindPattern(
+            Pattern = supFindPattern(
                 (CONST PBYTE)Pattern, DllVirtualSize - (Pattern - DllBase),
                 (CONST PBYTE)PCIBEEF_PATTERN, sizeof(PCIBEEF_PATTERN));
             if (Pattern) {
@@ -543,7 +505,7 @@ UINT ProcessVirtualBoxFile(
         //
         // CAFE
         //
-        Pattern = FindPattern(
+        Pattern = supFindPattern(
             (CONST PBYTE)DllBase, DllVirtualSize,
             (CONST PBYTE)PCICAFE_PATTERN, sizeof(PCICAFE_PATTERN));
         if (Pattern) {
@@ -562,7 +524,7 @@ UINT ProcessVirtualBoxFile(
         else
             uResult = (UINT)-2;
 
-    } while (cond);
+    } while (FALSE);
 
     if (usFileName.Buffer != NULL) {
         RtlFreeUnicodeString(&usFileName);

