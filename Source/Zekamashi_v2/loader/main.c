@@ -227,6 +227,66 @@ BOOL CreatePatchTable(
 }
 
 /*
+* ListTokenPrivileges
+*
+* Purpose:
+*
+* List all available privileges of current process token.
+*
+*/
+VOID ListTokenPrivileges()
+{
+    PTOKEN_PRIVILEGES pTokenPrivs;
+    HANDLE TokenHandle = supGetCurrentProcessToken();
+
+    WCHAR szPrivName[MAX_PATH + 1];
+    ULONG cchName;
+
+    BOOLEAN Enabled, EnabledByDefault;
+
+    printf_s(T_PRNTDEFAULT, "[LDR] Listing process token privileges...");
+
+    if (TokenHandle) {
+
+        pTokenPrivs = (PTOKEN_PRIVILEGES)supGetTokenInfo(TokenHandle,
+            TokenPrivileges,
+            NULL);
+
+        if (pTokenPrivs) {
+
+            for (ULONG i = 0; i < pTokenPrivs->PrivilegeCount; i++) {
+
+                //
+                // Output privilege flags like Process Explorer.
+                //
+                szPrivName[0] = 0;
+                cchName = MAX_PATH;
+                if (LookupPrivilegeName(NULL, &pTokenPrivs->Privileges[i].Luid,
+                    szPrivName, &cchName))
+                {
+                    Enabled = pTokenPrivs->Privileges[i].Attributes & SE_PRIVILEGE_ENABLED;
+                    EnabledByDefault = pTokenPrivs->Privileges[i].Attributes & SE_PRIVILEGE_ENABLED_BY_DEFAULT;
+
+                    printf_s("[LDR] %ws %s %s\r\n",
+                        szPrivName,
+                        Enabled ? "Enabled" : "Disabled",
+                        EnabledByDefault ? "(Default Enabled)" : "");
+
+                }
+
+            }
+
+            supHeapFree(pTokenPrivs);
+        }
+        else {
+            printf_s(T_PRNTDEFAULT, "[!] Could not query token privileges");
+        }
+        NtClose(TokenHandle);
+    }
+
+}
+
+/*
 * AssignPrivileges
 *
 * Purpose:
@@ -279,6 +339,10 @@ int VBoxLdrMain(
 
     printf_s("[>] Entering %s\r\n", __FUNCTION__);
 
+#ifdef _DEBUG
+    printf_s(T_PRNTDEFAULT, "[!] Debug build!");
+#endif
+
     do {
 
         //
@@ -298,6 +362,13 @@ int VBoxLdrMain(
         if (osv.dwMajorVersion < 6) {
             printf_s(T_PRNTDEFAULT, "LDR: This operation system version is not supported");
             break;
+        }
+
+        if (!supUserIsFullAdmin()) {
+            printf_s(T_PRNTDEFAULT, "[!] No administrator rights or runs not elevated, program will fail");
+        }
+        else {
+            ListTokenPrivileges();
         }
 
         ShowVirtualBoxVersion();
@@ -330,7 +401,6 @@ int VBoxLdrMain(
             }
 
         }
-
 
         //
         // Parse command line, can only be /s /c or /? 

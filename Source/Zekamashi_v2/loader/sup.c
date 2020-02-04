@@ -193,36 +193,48 @@ BOOL supRegDeleteKeyRecursive(
 *
 */
 NTSTATUS supEnablePrivilege(
-    _In_ DWORD PrivilegeName,
-    _In_ BOOL fEnable
+    _In_ DWORD Privilege,
+    _In_ BOOL Enable
 )
 {
-    NTSTATUS         status;
-    ULONG            dummy;
-    HANDLE           hToken;
-    TOKEN_PRIVILEGES TokenPrivileges;
+    ULONG Length;
+    NTSTATUS Status;
+    HANDLE TokenHandle;
+    LUID LuidPrivilege;
 
-    status = NtOpenProcessToken(
+    PTOKEN_PRIVILEGES NewState;
+    UCHAR Buffer[sizeof(TOKEN_PRIVILEGES) + sizeof(LUID_AND_ATTRIBUTES)];
+
+    Status = NtOpenProcessToken(
         NtCurrentProcess(),
         TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
-        &hToken);
+        &TokenHandle);
 
-    if (!NT_SUCCESS(status)) {
-        return status;
+    if (!NT_SUCCESS(Status)) {
+        return Status;
     }
 
-    TokenPrivileges.PrivilegeCount = 1;
-    TokenPrivileges.Privileges[0].Luid.LowPart = PrivilegeName;
-    TokenPrivileges.Privileges[0].Luid.HighPart = 0;
-    TokenPrivileges.Privileges[0].Attributes = (fEnable) ? SE_PRIVILEGE_ENABLED : 0;
-    status = NtAdjustPrivilegesToken(hToken, FALSE, &TokenPrivileges,
-        sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PULONG)&dummy);
-    if (status == STATUS_NOT_ALL_ASSIGNED) {
-        status = STATUS_PRIVILEGE_NOT_HELD;
+    NewState = (PTOKEN_PRIVILEGES)Buffer;
+
+    LuidPrivilege = RtlConvertUlongToLuid(Privilege);
+
+    NewState->PrivilegeCount = 1;
+    NewState->Privileges[0].Luid = LuidPrivilege;
+    NewState->Privileges[0].Attributes = Enable ? SE_PRIVILEGE_ENABLED : 0;
+
+    Status = NtAdjustPrivilegesToken(TokenHandle,
+        FALSE,
+        NewState,
+        sizeof(Buffer),
+        NULL,
+        &Length);
+
+    if (Status == STATUS_NOT_ALL_ASSIGNED) {
+        Status = STATUS_PRIVILEGE_NOT_HELD;
     }
 
-    NtClose(hToken);
-    return status;
+    NtClose(TokenHandle);
+    return Status;
 }
 
 /*
@@ -239,14 +251,14 @@ NTSTATUS supEnablePrivilege(
 *
 */
 void supCopyMemory(
-    _Inout_ void *dest,
+    _Inout_ void* dest,
     _In_ size_t cbdest,
-    _In_ const void *src,
+    _In_ const void* src,
     _In_ size_t cbsrc
 )
 {
-    char *d = (char*)dest;
-    char *s = (char*)src;
+    char* d = (char*)dest;
+    char* s = (char*)src;
 
     if ((dest == 0) || (src == 0) || (cbdest == 0))
         return;
@@ -351,59 +363,37 @@ BOOL supProcessExist(
 }
 
 /*
-* supLoadDriver
+* supxCreateDriverEntry
 *
 * Purpose:
 *
-* Install driver and load it.
-*
-* N.B.
-* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+* Creating registry entry for driver.
 *
 */
-NTSTATUS supLoadDriver(
-    _In_ LPCWSTR DriverName,
-    _In_ LPCWSTR DriverPath,
-    _In_ BOOLEAN UnloadPreviousInstance
+NTSTATUS supxCreateDriverEntry(
+    _In_opt_ LPCWSTR DriverPath,
+    _In_ LPCWSTR KeyName
 )
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     DWORD dwData, dwResult;
     HKEY keyHandle = NULL;
-    SIZE_T keyOffset;
-    UNICODE_STRING driverServiceName, driverImagePath;
-
-    WCHAR szBuffer[MAX_PATH + 1];
-
-    if (DriverName == NULL)
-        return STATUS_INVALID_PARAMETER_1;
-    if (DriverPath == NULL)
-        return STATUS_INVALID_PARAMETER_2;
+    UNICODE_STRING driverImagePath;
 
     RtlInitEmptyUnicodeString(&driverImagePath, NULL, 0);
-    if (!RtlDosPathNameToNtPathName_U(DriverPath,
-        &driverImagePath,
-        NULL,
-        NULL))
-    {
-        return STATUS_INVALID_PARAMETER_2;
-    }
 
-    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
-
-    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
-
-    if (FAILED(StringCchPrintf(szBuffer, MAX_PATH,
-        DRIVER_REGKEY,
-        NT_REG_PREP,
-        DriverName)))
-    {
-        status = STATUS_INVALID_PARAMETER_1;
-        goto Cleanup;
+    if (DriverPath) {
+        if (!RtlDosPathNameToNtPathName_U(DriverPath,
+            &driverImagePath,
+            NULL,
+            NULL))
+        {
+            return STATUS_INVALID_PARAMETER_2;
+        }
     }
 
     if (ERROR_SUCCESS != RegCreateKeyEx(HKEY_LOCAL_MACHINE,
-        &szBuffer[keyOffset],
+        KeyName,
         0,
         NULL,
         REG_OPTION_NON_VOLATILE,
@@ -451,12 +441,14 @@ NTSTATUS supLoadDriver(
         if (dwResult != ERROR_SUCCESS)
             break;
 
-        dwResult = RegSetValueEx(keyHandle,
-            TEXT("ImagePath"),
-            0,
-            REG_EXPAND_SZ,
-            (BYTE*)driverImagePath.Buffer,
-            (DWORD)driverImagePath.Length + sizeof(UNICODE_NULL));
+        if (DriverPath) {
+            dwResult = RegSetValueEx(keyHandle,
+                TEXT("ImagePath"),
+                0,
+                REG_EXPAND_SZ,
+                (BYTE*)driverImagePath.Buffer,
+                (DWORD)driverImagePath.Length + sizeof(UNICODE_NULL));
+        }
 
     } while (FALSE);
 
@@ -464,8 +456,66 @@ NTSTATUS supLoadDriver(
 
     if (dwResult != ERROR_SUCCESS) {
         status = STATUS_ACCESS_DENIED;
-        goto Cleanup;
     }
+    else
+    {
+        status = STATUS_SUCCESS;
+    }
+
+Cleanup:
+    if (DriverPath) {
+        if (driverImagePath.Buffer) {
+            RtlFreeUnicodeString(&driverImagePath);
+        }
+    }
+    return status;
+}
+
+/*
+* supLoadDriver
+*
+* Purpose:
+*
+* Install driver and load it.
+*
+* N.B.
+* SE_LOAD_DRIVER_PRIVILEGE is required to be assigned and enabled.
+*
+*/
+NTSTATUS supLoadDriver(
+    _In_ LPCWSTR DriverName,
+    _In_ LPCWSTR DriverPath,
+    _In_ BOOLEAN UnloadPreviousInstance
+)
+{
+    SIZE_T keyOffset;
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    UNICODE_STRING driverServiceName;
+
+    WCHAR szBuffer[MAX_PATH + 1];
+
+    if (DriverName == NULL)
+        return STATUS_INVALID_PARAMETER_1;
+    if (DriverPath == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+
+    RtlSecureZeroMemory(szBuffer, sizeof(szBuffer));
+
+    keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    if (FAILED(StringCchPrintf(szBuffer, MAX_PATH,
+        DRIVER_REGKEY,
+        NT_REG_PREP,
+        DriverName)))
+    {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    status = supxCreateDriverEntry(DriverPath,
+        &szBuffer[keyOffset]);
+
+    if (!NT_SUCCESS(status))
+        return status;
 
     RtlInitUnicodeString(&driverServiceName, szBuffer);
     status = NtLoadDriver(&driverServiceName);
@@ -486,11 +536,8 @@ NTSTATUS supLoadDriver(
             status = STATUS_SUCCESS;
     }
 
-Cleanup:
-    RtlFreeUnicodeString(&driverImagePath);
     return status;
 }
-
 
 /*
 * supUnloadDriver
@@ -525,6 +572,12 @@ NTSTATUS supUnloadDriver(
     }
 
     keyOffset = RTL_NUMBER_OF(NT_REG_PREP);
+
+    status = supxCreateDriverEntry(NULL,
+        &szBuffer[keyOffset]);
+
+    if (!NT_SUCCESS(status))
+        return status;
 
     RtlInitUnicodeString(&driverServiceName, szBuffer);
     status = NtUnloadDriver(&driverServiceName);
@@ -1231,4 +1284,213 @@ PVOID supFindPattern(
     } while (BufferSize > 0);
 
     return NULL;
+}
+
+/*
+* supGetCurrentProcessToken
+*
+* Purpose:
+*
+* Return current process token value with TOKEN_QUERY access right.
+*
+*/
+HANDLE supGetCurrentProcessToken(
+    VOID)
+{
+    HANDLE hToken = NULL;
+
+    if (NT_SUCCESS(NtOpenProcessToken(
+        NtCurrentProcess(),
+        TOKEN_QUERY,
+        &hToken)))
+    {
+        return hToken;
+    }
+    return NULL;
+}
+
+/*
+* supUserIsFullAdmin
+*
+* Purpose:
+*
+* Tests if the current user is admin with full access token.
+*
+*/
+BOOL supUserIsFullAdmin(
+    VOID
+)
+{
+    BOOL     bResult = FALSE;
+    HANDLE   hToken = NULL;
+    NTSTATUS status;
+    DWORD    i, Attributes;
+    ULONG    ReturnLength = 0;
+
+    PTOKEN_GROUPS pTkGroups;
+
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    PSID AdministratorsGroup = NULL;
+
+    hToken = supGetCurrentProcessToken();
+    if (hToken == NULL)
+        return FALSE;
+
+    do {
+        if (!NT_SUCCESS(RtlAllocateAndInitializeSid(
+            &NtAuthority,
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0,
+            &AdministratorsGroup)))
+        {
+            break;
+        }
+
+        status = NtQueryInformationToken(hToken, TokenGroups, NULL, 0, &ReturnLength);
+        if (status != STATUS_BUFFER_TOO_SMALL)
+            break;
+
+        pTkGroups = (PTOKEN_GROUPS)supHeapAlloc((SIZE_T)ReturnLength);
+        if (pTkGroups == NULL)
+            break;
+
+        status = NtQueryInformationToken(hToken, TokenGroups, pTkGroups, ReturnLength, &ReturnLength);
+        if (NT_SUCCESS(status)) {
+            if (pTkGroups->GroupCount > 0)
+                for (i = 0; i < pTkGroups->GroupCount; i++) {
+                    Attributes = pTkGroups->Groups[i].Attributes;
+                    if (RtlEqualSid(AdministratorsGroup, pTkGroups->Groups[i].Sid))
+                        if (
+                            (Attributes & SE_GROUP_ENABLED) &&
+                            (!(Attributes & SE_GROUP_USE_FOR_DENY_ONLY))
+                            )
+                        {
+                            bResult = TRUE;
+                            break;
+                        }
+                }
+        }
+        supHeapFree(pTkGroups);
+
+    } while (FALSE);
+
+    if (AdministratorsGroup != NULL) {
+        RtlFreeSid(AdministratorsGroup);
+    }
+
+    NtClose(hToken);
+    return bResult;
+}
+
+/*
+* supQueryTokenUserSid
+*
+* Purpose:
+*
+* Return SID of given token.
+*
+* Use supHeapFree to free memory allocated for result.
+*
+*/
+PSID supQueryTokenUserSid(
+    _In_ HANDLE ProcessToken
+)
+{
+    PSID resultSid = NULL;
+    PTOKEN_USER ptu;
+    NTSTATUS status;
+    ULONG sidLength = 0, allocLength;
+
+    status = NtQueryInformationToken(
+        ProcessToken,
+        TokenUser,
+        NULL, 0, &sidLength);
+
+    if (status == STATUS_BUFFER_TOO_SMALL) {
+
+        ptu = (PTOKEN_USER)supHeapAlloc(sidLength);
+
+        if (ptu) {
+
+            status = NtQueryInformationToken(
+                ProcessToken,
+                TokenUser,
+                ptu,
+                sidLength,
+                &sidLength);
+
+            if (NT_SUCCESS(status)) {
+
+                allocLength = SECURITY_MAX_SID_SIZE;
+                if (sidLength > allocLength)
+                    allocLength = sidLength;
+
+                resultSid = (PSID)supHeapAlloc(allocLength);
+                if (resultSid) {
+
+                    status = RtlCopySid(
+                        allocLength,
+                        resultSid,
+                        ptu->User.Sid);
+
+                }
+            }
+
+            supHeapFree(ptu);
+        }
+    }
+
+    return (NT_SUCCESS(status)) ? resultSid : NULL;
+}
+
+/*
+* supGetTokenInfo
+*
+* Purpose:
+*
+* Returns buffer with token information by given TokenInformationClass.
+*
+* Returned buffer must be freed with supHeapFree after usage.
+*
+*/
+PVOID supGetTokenInfo(
+    _In_ HANDLE TokenHandle,
+    _In_ TOKEN_INFORMATION_CLASS TokenInformationClass,
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    PVOID Buffer = NULL;
+    ULONG returnLength = 0;
+
+    if (ReturnLength)
+        *ReturnLength = 0;
+
+    NtQueryInformationToken(TokenHandle,
+        TokenInformationClass,
+        NULL,
+        0,
+        &returnLength);
+
+    Buffer = supHeapAlloc((SIZE_T)returnLength);
+    if (Buffer) {
+
+        if (NT_SUCCESS(NtQueryInformationToken(TokenHandle,
+            TokenInformationClass,
+            Buffer,
+            returnLength,
+            &returnLength)))
+        {
+            if (ReturnLength)
+                *ReturnLength = returnLength;
+            return Buffer;
+        }
+        else {
+            supHeapFree(Buffer);
+            return NULL;
+        }
+    }
+
+    return Buffer;
 }

@@ -28,8 +28,13 @@
 #include <Windows.h>
 #include <strsafe.h>
 #include <ntstatus.h>
-#include "resource.h"
 #include "ntdll/ntos.h"
+
+#define _NTDEF_
+#include <ntsecapi.h>
+#undef _NTDEF_
+
+#include "resource.h"
 #include "minirtl/minirtl.h"
 #include "minirtl/cmdline.h"
 #include "hde/hde64.h"

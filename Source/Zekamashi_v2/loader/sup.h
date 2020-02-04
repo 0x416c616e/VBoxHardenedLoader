@@ -52,8 +52,8 @@ NTSTATUS supOpenDriver(
     _Out_ PHANDLE DeviceHandle);
 
 NTSTATUS supEnablePrivilege(
-    _In_ DWORD PrivilegeName,
-    _In_ BOOL fEnable);
+    _In_ DWORD Privilege,
+    _In_ BOOL Enable);
 
 VOID supPurgeSystemCache(
     VOID);
@@ -117,3 +117,17 @@ PVOID supFindPattern(
     _In_ SIZE_T BufferSize,
     _In_ CONST PBYTE Pattern,
     _In_ SIZE_T PatternSize);
+
+HANDLE supGetCurrentProcessToken(
+    VOID);
+
+BOOL supUserIsFullAdmin(
+    VOID);
+
+PSID supQueryTokenUserSid(
+    _In_ HANDLE ProcessToken);
+
+PVOID supGetTokenInfo(
+    _In_ HANDLE TokenHandle,
+    _In_ TOKEN_INFORMATION_CLASS TokenInformationClass,
+    _Out_opt_ PULONG ReturnLength);

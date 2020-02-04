@@ -114,14 +114,17 @@ BOOL VictimCreate(
         do {
             
             if (supIsObjectExists((LPWSTR)L"\\Device", Name)) {
-                printf_s("[!] Victim driver already loaded, force reload\r\n");
+                printf_s("[LDR] Victim driver already loaded, force reload\r\n");
 
-                printf_s("[!] Attempt to unload %ws\r\n", Name);
+                printf_s("[LDR] Attempt to unload %ws\r\n", Name);
 
                 NTSTATUS ntStatus;
                 if (!VictimLoadUnload(Name, driverFileName, FALSE, TRUE, &ntStatus)) {
                     printf_s("[!] Could not force unload victim, NTSTATUS(0x%lX) abort\r\n", ntStatus);
                     break;
+                }
+                else {
+                    printf_s(T_PRNTDEFAULT, "[LDR] Previous instance of victim driver unloaded");
                 }
             }
 
